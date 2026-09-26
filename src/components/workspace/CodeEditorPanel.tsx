@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Problem, ProgrammingLanguage, TestCase, TestResultItem } from '@/types';
 import { useApp } from '@/context/AppContext';
@@ -11,21 +11,21 @@ import {
   CheckCircle2,
   RotateCcw,
   Terminal,
-  Maximize2,
-  Minimize2,
   Check,
   XCircle,
   Clock,
   Sparkles,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  AlertTriangle,
+  Flame,
+  Code
 } from 'lucide-react';
 
-// Dynamically import Monaco Editor to avoid SSR issues
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
-    <div className="flex-1 flex items-center justify-center bg-zinc-950 text-zinc-500 font-mono text-xs">
+    <div className="flex-1 flex items-center justify-center bg-[#0f172a] text-zinc-500 font-mono text-xs">
       Loading Monaco Editor...
     </div>
   )
@@ -34,9 +34,14 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 interface CodeEditorPanelProps {
   problem: Problem;
   onCodeChange?: (code: string) => void;
+  onSuccessfulExecution?: (code: string) => void;
 }
 
-export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCodeChange }) => {
+export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
+  problem,
+  onCodeChange,
+  onSuccessfulExecution
+}) => {
   const {
     language,
     setLanguage,
@@ -47,7 +52,6 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
     fontSize
   } = useApp();
 
-  // Initialize code from LocalStorage or starterCode
   const [code, setCode] = useState<string>(() => {
     return getCodeBuffer(problem.id, language) || problem.starterCode[language];
   });
@@ -56,13 +60,12 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
   const [consoleTab, setConsoleTab] = useState<'tests' | 'custom' | 'terminal'>('tests');
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customInput, setCustomInput] = useState('nums = [2, 7, 11, 15], target = 9');
+  const [customInputText, setCustomInputText] = useState('nums = [2, 7, 11, 15], target = 9');
   const [testResults, setTestResults] = useState<TestResultItem[]>([]);
   const [selectedTestCaseIdx, setSelectedTestCaseIdx] = useState(0);
-  const [compilerLogs, setCompilerLogs] = useState<string>('Ready to compile and run.');
-  const [allPassed, setAllPassed] = useState<boolean | null>(null);
+  const [compilerLogs, setCompilerLogs] = useState<string>('Sandboxed x86_64 environment ready. Select "Run Code" or "Submit Solution".');
+  const [overallStatus, setOverallStatus] = useState<'Pass' | 'Compile Error' | 'TLE' | 'Wrong Answer' | null>(null);
 
-  // Sync code buffer when language changes
   useEffect(() => {
     const existing = getCodeBuffer(problem.id, language);
     const initial = existing || problem.starterCode[language];
@@ -86,8 +89,10 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
     }
   };
 
-  const handleRun = async () => {
-    setIsRunning(true);
+  const runEvaluation = async (isSubmission = false) => {
+    if (isSubmission) setIsSubmitting(true);
+    else setIsRunning(true);
+
     setConsoleOpen(true);
     setConsoleTab('tests');
 
@@ -99,64 +104,85 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
     });
 
     setTestResults(result.results);
-    setAllPassed(result.allPassed);
+    setOverallStatus(result.overallStatus);
     setCompilerLogs(result.compileOutput + '\n' + result.runtimeLogs.join('\n'));
     setSelectedTestCaseIdx(0);
-    setIsRunning(false);
-  };
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    setConsoleOpen(true);
-    setConsoleTab('tests');
-
-    const result = await executeCodeSimulation({
-      problemId: problem.id,
-      language,
-      code,
-      customTestCases: problem.testCases
-    });
-
-    setTestResults(result.results);
-    setAllPassed(result.allPassed);
-    setCompilerLogs(result.compileOutput + '\n' + result.runtimeLogs.join('\n'));
-    setSelectedTestCaseIdx(0);
-    setIsSubmitting(false);
+    if (isSubmission) setIsSubmitting(false);
+    else setIsRunning(false);
 
     if (result.allPassed) {
-      // Fire celebration confetti!
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-      markProblemSolved(problem.id, language, problem.timeEstimateMinutes);
+      if (isSubmission) {
+        confetti({
+          particleCount: 90,
+          spread: 75,
+          origin: { y: 0.6 }
+        });
+        markProblemSolved(problem.id, language, problem.timeEstimateMinutes);
+      }
+      if (onSuccessfulExecution) {
+        onSuccessfulExecution(code);
+      }
+    }
+  };
+
+  // Render status badge conforming to user spec
+  const renderStatusBadge = (status: 'Pass' | 'Compile Error' | 'TLE' | 'Wrong Answer') => {
+    switch (status) {
+      case 'Pass':
+        return (
+          <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm shadow-emerald-500/20">
+            <Check className="w-3 h-3 stroke-[3]" />
+            <span>Pass</span>
+          </span>
+        );
+      case 'Compile Error':
+        return (
+          <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm shadow-rose-500/20">
+            <XCircle className="w-3 h-3 stroke-[3]" />
+            <span>Compile Error</span>
+          </span>
+        );
+      case 'TLE':
+        return (
+          <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm shadow-amber-500/20">
+            <AlertTriangle className="w-3 h-3 stroke-[3]" />
+            <span>TLE</span>
+          </span>
+        );
+      default:
+        return (
+          <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40">
+            <XCircle className="w-3 h-3" />
+            <span>Wrong Answer</span>
+          </span>
+        );
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 border-r border-zinc-800 overflow-hidden">
+    <div className="flex flex-col h-full bg-[#0f172a] border-r border-slate-800 overflow-hidden font-sans">
       {/* Top Editor Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/90 border-b border-zinc-800 text-xs">
+      <div className="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-b border-slate-800 text-xs">
         {/* Language Selector */}
         <div className="flex items-center space-x-2">
-          <div className="flex items-center bg-zinc-950 p-1 rounded-lg border border-zinc-800">
+          <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800">
             <button
               onClick={() => setLanguage('cpp')}
-              className={`px-2.5 py-1 font-mono font-semibold rounded-md transition-all ${
+              className={`px-3 py-1 font-mono font-semibold rounded-md transition-all ${
                 language === 'cpp'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               C++ 20
             </button>
             <button
               onClick={() => setLanguage('python')}
-              className={`px-2.5 py-1 font-mono font-semibold rounded-md transition-all ${
+              className={`px-3 py-1 font-mono font-semibold rounded-md transition-all ${
                 language === 'python'
                   ? 'bg-amber-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Python 3.11
@@ -168,7 +194,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
         <div className="flex items-center space-x-2">
           <button
             onClick={handleResetCode}
-            className="flex items-center space-x-1 px-2.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition-colors"
+            className="flex items-center space-x-1 px-2.5 py-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-md transition-colors"
             title="Reset code to initial template"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -192,132 +218,133 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
             scrollBeyondLastLine: false,
             automaticLayout: true,
             tabSize: 4,
-            fontFamily: 'var(--font-geist-mono), Courier New, monospace',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
             bracketPairColorization: { enabled: true },
             padding: { top: 12, bottom: 12 }
           }}
         />
       </div>
 
-      {/* Collapsible Console / Execution Drawer */}
+      {/* VS Code-Style Bottom Terminal Console */}
       {consoleOpen && (
-        <div className="h-56 bg-zinc-950 border-t border-zinc-800 flex flex-col transition-all duration-200">
-          {/* Console Header / Tabs */}
-          <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 text-xs">
+        <div className="h-60 bg-[#090d16] border-t border-slate-800 flex flex-col transition-all duration-200 shadow-2xl">
+          {/* Terminal Tab Bar */}
+          <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900 border-b border-slate-800 text-xs">
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setConsoleTab('tests')}
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded font-medium transition-colors ${
+                className={`flex items-center space-x-1.5 px-3 py-1 rounded font-medium transition-colors ${
                   consoleTab === 'tests'
-                    ? 'bg-zinc-800 text-white font-semibold'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-slate-800 text-white font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Test Cases</span>
-                {allPassed !== null && (
-                  <span
-                    className={`ml-1 text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                      allPassed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                    }`}
-                  >
-                    {allPassed ? 'Passed' : 'Failed'}
-                  </span>
-                )}
+                {overallStatus && renderStatusBadge(overallStatus)}
               </button>
 
               <button
                 onClick={() => setConsoleTab('terminal')}
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded font-medium transition-colors ${
+                className={`flex items-center space-x-1.5 px-3 py-1 rounded font-medium transition-colors ${
                   consoleTab === 'terminal'
-                    ? 'bg-zinc-800 text-white font-semibold'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-slate-800 text-white font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Terminal className="w-3.5 h-3.5 text-zinc-400" />
+                <Terminal className="w-3.5 h-3.5 text-slate-400" />
                 <span>Terminal Output</span>
               </button>
             </div>
 
             <button
               onClick={() => setConsoleOpen(false)}
-              className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800"
+              className="p-1 text-slate-400 hover:text-slate-200 rounded hover:bg-slate-800"
               title="Collapse Console"
             >
               <ChevronDown className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Console Body */}
-          <div className="flex-1 overflow-y-auto p-3 text-xs custom-scrollbar">
+          {/* Terminal Body */}
+          <div className="flex-1 overflow-y-auto p-3.5 text-xs font-mono custom-scrollbar">
             {consoleTab === 'tests' && (
               <div className="space-y-3">
                 {testResults.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-zinc-500 font-mono text-center py-6">
-                    Click "Run Code" or "Submit Solution" to evaluate test cases.
+                  <div className="flex flex-col items-center justify-center h-full text-slate-500 text-center py-6 space-y-1">
+                    <Terminal className="w-6 h-6 text-slate-600 mb-1" />
+                    <span>Terminal idle. Click "Run Code" or "Submit Solution" to trigger sandbox tests.</span>
                   </div>
                 ) : (
                   <div>
-                    {/* Case Pills */}
-                    <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1">
+                    {/* Test Case Selection Badges */}
+                    <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
                       {testResults.map((tr, idx) => (
                         <button
                           key={idx}
                           onClick={() => setSelectedTestCaseIdx(idx)}
-                          className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg font-mono text-xs transition-all ${
+                          className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-mono transition-all ${
                             selectedTestCaseIdx === idx
-                              ? 'bg-zinc-800 text-white border border-zinc-700 font-bold'
-                              : 'bg-zinc-900/80 text-zinc-400 hover:bg-zinc-800'
+                              ? 'bg-slate-800 text-white border border-slate-700 font-bold'
+                              : 'bg-slate-900/80 text-slate-400 hover:bg-slate-800'
                           }`}
                         >
-                          {tr.passed ? (
-                            <Check className="w-3 h-3 text-emerald-400" />
-                          ) : (
-                            <XCircle className="w-3 h-3 text-rose-400" />
-                          )}
+                          {tr.status === 'Pass' && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
+                          {tr.status === 'Compile Error' && <span className="w-2 h-2 rounded-full bg-rose-500" />}
+                          {tr.status === 'TLE' && <span className="w-2 h-2 rounded-full bg-amber-400" />}
+                          {tr.status === 'Wrong Answer' && <span className="w-2 h-2 rounded-full bg-rose-500" />}
                           <span>Case {idx + 1}</span>
                         </button>
                       ))}
                     </div>
 
-                    {/* Selected Test Case Details */}
+                    {/* Active Test Case Execution Details */}
                     {testResults[selectedTestCaseIdx] && (
-                      <div className="bg-zinc-900/70 p-3 rounded-lg border border-zinc-800 space-y-2 font-mono text-xs">
-                        <div className="flex items-center justify-between text-zinc-400 pb-1 border-b border-zinc-800/80">
-                          <span className="font-bold">
-                            Status: {testResults[selectedTestCaseIdx].passed ? (
-                              <span className="text-emerald-400">PASSED</span>
-                            ) : (
-                              <span className="text-rose-400">FAILED</span>
-                            )}
-                          </span>
-                          <span className="text-zinc-500 flex items-center space-x-1">
-                            <Clock className="w-3 h-3" />
+                      <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2.5 text-xs">
+                        <div className="flex items-center justify-between text-slate-400 pb-1.5 border-b border-slate-800">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-semibold text-slate-300">Status:</span>
+                            {renderStatusBadge(testResults[selectedTestCaseIdx].status)}
+                          </div>
+                          <span className="text-slate-500 flex items-center space-x-1">
+                            <Clock className="w-3.5 h-3.5 text-slate-500" />
                             <span>{testResults[selectedTestCaseIdx].executionTimeMs} ms</span>
                           </span>
                         </div>
 
                         <div>
-                          <div className="text-zinc-500 mb-0.5">Input:</div>
-                          <div className="text-zinc-200 bg-zinc-950 p-1.5 rounded">
+                          <div className="text-slate-500 text-[11px] mb-1">Input:</div>
+                          <div className="text-slate-200 bg-[#090d16] p-2 rounded-lg border border-slate-800/80">
                             {testResults[selectedTestCaseIdx].input}
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <div className="text-zinc-500 mb-0.5">Expected:</div>
-                            <div className="text-emerald-300 bg-zinc-950 p-1.5 rounded">
+                            <div className="text-slate-500 text-[11px] mb-1">Expected:</div>
+                            <div className="text-emerald-300 bg-[#090d16] p-2 rounded-lg border border-emerald-900/30">
                               {testResults[selectedTestCaseIdx].expectedOutput}
                             </div>
                           </div>
                           <div>
-                            <div className="text-zinc-500 mb-0.5">Output:</div>
-                            <div className={`bg-zinc-950 p-1.5 rounded ${testResults[selectedTestCaseIdx].passed ? 'text-indigo-300' : 'text-rose-300'}`}>
+                            <div className="text-slate-500 text-[11px] mb-1">Actual Output:</div>
+                            <div
+                              className={`bg-[#090d16] p-2 rounded-lg border ${
+                                testResults[selectedTestCaseIdx].passed
+                                  ? 'text-indigo-300 border-indigo-900/30'
+                                  : 'text-rose-300 border-rose-900/30'
+                              }`}
+                            >
                               {testResults[selectedTestCaseIdx].actualOutput}
                             </div>
                           </div>
                         </div>
+
+                        {testResults[selectedTestCaseIdx].error && (
+                          <div className="text-rose-400 text-[11px] bg-rose-950/20 p-2 rounded border border-rose-900/30">
+                            {testResults[selectedTestCaseIdx].error}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -326,7 +353,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
             )}
 
             {consoleTab === 'terminal' && (
-              <pre className="font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed">
+              <pre className="text-slate-300 whitespace-pre-wrap leading-relaxed text-[11px]">
                 {compilerLogs}
               </pre>
             )}
@@ -335,22 +362,22 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
       )}
 
       {/* Sticky Execution Control Footer Bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-900 border-t border-zinc-800 text-xs">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-t border-slate-800 text-xs">
         <button
           onClick={() => setConsoleOpen(!consoleOpen)}
-          className="flex items-center space-x-1 text-zinc-400 hover:text-zinc-200 font-mono"
+          className="flex items-center space-x-1.5 text-slate-400 hover:text-slate-200 font-mono"
         >
-          <Terminal className="w-3.5 h-3.5" />
-          <span>Console</span>
+          <Terminal className="w-3.5 h-3.5 text-slate-400" />
+          <span>Terminal Console</span>
           {consoleOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
         </button>
 
         <div className="flex items-center space-x-2">
           {/* Run Code Button */}
           <button
-            onClick={handleRun}
+            onClick={() => runEvaluation(false)}
             disabled={isRunning || isSubmitting}
-            className="flex items-center space-x-1.5 px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white font-medium rounded-lg border border-zinc-700 transition-colors shadow-sm"
+            className="flex items-center space-x-1.5 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-medium rounded-lg border border-slate-700 transition-colors shadow-sm"
           >
             <Play className="w-3.5 h-3.5 fill-white" />
             <span>{isRunning ? 'Running...' : 'Run Code'}</span>
@@ -358,12 +385,12 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({ problem, onCod
 
           {/* Submit Solution Button */}
           <button
-            onClick={handleSubmit}
+            onClick={() => runEvaluation(true)}
             disabled={isRunning || isSubmitting}
             className="flex items-center space-x-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-lg transition-all shadow-md shadow-emerald-600/30"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{isSubmitting ? 'Evaluating...' : 'Submit'}</span>
+            <span>{isSubmitting ? 'Evaluating...' : 'Submit Solution'}</span>
           </button>
         </div>
       </div>

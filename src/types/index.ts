@@ -143,6 +143,7 @@ export interface UserProgress {
       language: ProgrammingLanguage;
     };
   };
+  failedProblems?: string[];
   bookmarkedProblems: string[];
   codeBuffers: {
     [key: string]: string; // key: `${problemId}_${language}`
@@ -174,7 +175,7 @@ export interface UserProgress {
 }
 
 export interface SocraticHintResponse {
-  hintLevel: number;
+  hintLevel: 1 | 2 | 3;
   title: string;
   explanation: string;
   leadingQuestion: string;
@@ -183,12 +184,27 @@ export interface SocraticHintResponse {
 export interface CodeReviewResponse {
   timeComplexity: string;
   spaceComplexity: string;
-  timeExplanation: string;
-  spaceExplanation: string;
-  rating: 'Optimal' | 'Suboptimal' | 'Needs Work';
-  suggestions: string[];
-  memoryOptimizations: string[];
-  cleanCodeFeedback: string[];
+  passesConstraints: boolean;
+  cPlusPlusTips: string;
+  pythonTips: string;
+  summary: string;
+  rating?: 'Optimal' | 'Suboptimal' | 'Needs Work';
+  suggestions?: string[];
+}
+
+export interface TargetPracticeProblem {
+  id: string;
+  title: string;
+  difficulty: Difficulty;
+  category: string;
+  day: number;
+  reason: string;
+}
+
+export interface SmartRecommendationResponse {
+  recommendedTopic: string;
+  reason: string;
+  targetProblems: TargetPracticeProblem[];
 }
 
 export interface ChatMessage {
@@ -200,6 +216,7 @@ export interface ChatMessage {
 
 export interface TestResultItem {
   testCaseId: number;
+  status: 'Pass' | 'Compile Error' | 'TLE' | 'Wrong Answer';
   passed: boolean;
   input: string;
   expectedOutput: string;

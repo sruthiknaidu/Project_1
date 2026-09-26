@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Problem, ProgrammingLanguage, SocraticHintResponse, CodeReviewResponse, ChatMessage } from '@/types';
+import {
+  Problem,
+  ProgrammingLanguage,
+  SocraticHintResponse,
+  CodeReviewResponse,
+  ChatMessage
+} from '@/types';
 import { useApp } from '@/context/AppContext';
 import { MemoryDebugger } from '@/components/visualizer/MemoryDebugger';
 import { getSocraticHint, getCodeReview, chatWithSocraticTA } from '@/lib/gemini';
@@ -18,7 +24,9 @@ import {
   AlertCircle,
   Bot,
   User,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  Code2
 } from 'lucide-react';
 
 interface AIAssistantPanelProps {
@@ -30,7 +38,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
   const { language, geminiApiKey } = useApp();
   const [activeTab, setActiveTab] = useState<'hints' | 'visualizer' | 'review'>('hints');
 
-  // Hint Drawer State
+  // Hint Drawer State (AI Feature 2)
   const [unlockedLevel, setUnlockedLevel] = useState<number>(0);
   const [hintsList, setHintsList] = useState<SocraticHintResponse[]>([]);
   const [isLoadingHint, setIsLoadingHint] = useState(false);
@@ -40,14 +48,14 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
     {
       id: 'welcome',
       sender: 'assistant',
-      text: `Hello! I'm your Socratic TA for ${problem.title}. I can guide your thinking, clarify C++ vs Python trade-offs, and help you discover the optimal algorithm without spoiling the solution. Ask me anything!`,
+      text: `Welcome! I'm your Socratic TA for "${problem.title}". I'll guide your algorithm design without spoiling full code solutions. Ask me about pointer logic, time trade-offs, or C++ vs Python idioms!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
-  // Code Review State
+  // Code Review State (AI Feature 3)
   const [reviewResult, setReviewResult] = useState<CodeReviewResponse | null>(null);
   const [isLoadingReview, setIsLoadingReview] = useState(false);
 
@@ -70,7 +78,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
       setHintsList(prev => [...prev, hint]);
       setUnlockedLevel(nextLevel);
     } catch (e) {
-      console.error('Failed to get hint', e);
+      console.error('Failed to get Socratic hint', e);
     } finally {
       setIsLoadingHint(false);
     }
@@ -112,7 +120,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
       };
       setChatMessages(prev => [...prev, aiMsg]);
     } catch (err) {
-      console.error('Chat error', err);
+      console.error('Socratic chat error', err);
     } finally {
       setIsSendingMessage(false);
     }
@@ -125,28 +133,29 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
         problemId: problem.id,
         problemTitle: problem.title,
         problemDescription: problem.description,
+        constraints: problem.constraints,
         language,
         codeBuffer: currentCode,
         apiKey: geminiApiKey
       });
       setReviewResult(review);
     } catch (e) {
-      console.error('Code review error', e);
+      console.error('Complexity review error', e);
     } finally {
       setIsLoadingReview(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-hidden">
+    <div className="flex flex-col h-full bg-[#0f172a] text-slate-100 overflow-hidden font-sans">
       {/* Tab Navigation */}
-      <div className="flex items-center px-2 bg-zinc-900/90 border-b border-zinc-800 text-xs font-medium">
+      <div className="flex items-center px-2 bg-slate-900/90 border-b border-slate-800 text-xs font-medium">
         <button
           onClick={() => setActiveTab('hints')}
           className={`flex items-center space-x-1.5 px-3 py-2.5 border-b-2 transition-all ${
             activeTab === 'hints'
               ? 'border-emerald-500 text-emerald-400 font-semibold'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <Lightbulb className="w-3.5 h-3.5" />
@@ -158,7 +167,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
           className={`flex items-center space-x-1.5 px-3 py-2.5 border-b-2 transition-all ${
             activeTab === 'visualizer'
               ? 'border-emerald-500 text-emerald-400 font-semibold'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <Cpu className="w-3.5 h-3.5" />
@@ -170,7 +179,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
           className={`flex items-center space-x-1.5 px-3 py-2.5 border-b-2 transition-all ${
             activeTab === 'review'
               ? 'border-emerald-500 text-emerald-400 font-semibold'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <BarChart2 className="w-3.5 h-3.5" />
@@ -180,19 +189,19 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
 
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden">
-        {/* TAB 1: SOCRATIC AI TA & HINTS */}
+        {/* TAB 1: SOCRATIC AI TA & HINTS (AI Feature 2) */}
         {activeTab === 'hints' && (
           <div className="flex flex-col h-full">
             {/* Progressive Hint Drawer */}
-            <div className="p-4 border-b border-zinc-800/80 bg-zinc-900/40 space-y-3">
+            <div className="p-4 border-b border-slate-800/80 bg-slate-900/40 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center space-x-1.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center space-x-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Progressive Socratic Hints</span>
+                    <span>Socratic Progressive Hint Engine</span>
                   </h3>
-                  <p className="text-[11px] text-zinc-500">
-                    Tiered guidance designed to preserve your interview problem-solving muscle.
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Scaffolding support designed to build problem-solving intuition without revealing full code.
                   </p>
                 </div>
 
@@ -200,42 +209,42 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
                   <button
                     onClick={handleRequestNextHint}
                     disabled={isLoadingHint}
-                    className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs transition-colors shadow-sm"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs transition-colors shadow-sm shadow-emerald-600/30"
                   >
                     <Unlock className="w-3 h-3" />
-                    <span>{isLoadingHint ? 'Thinking...' : `Unlock Hint ${unlockedLevel + 1}`}</span>
+                    <span>{isLoadingHint ? 'Generating...' : `Unlock Tier ${unlockedLevel + 1}`}</span>
                   </button>
                 ) : (
                   <span className="text-[11px] text-emerald-400 font-mono flex items-center space-x-1">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>All hints unlocked</span>
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>All 3 tiers unlocked</span>
                   </span>
                 )}
               </div>
 
               {/* Unlocked Hint Cards */}
               {hintsList.length === 0 ? (
-                <div className="p-3 rounded-lg border border-dashed border-zinc-800 text-center text-xs text-zinc-500">
-                  No hints unlocked yet. Click "Unlock Hint 1" when you want an intuition nudge!
+                <div className="p-3.5 rounded-xl border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                  No hints unlocked yet. Click "Unlock Tier 1" for conceptual intuition.
                 </div>
               ) : (
-                <div className="space-y-2.5 max-h-48 overflow-y-auto custom-scrollbar">
+                <div className="space-y-2.5 max-h-52 overflow-y-auto custom-scrollbar">
                   {hintsList.map((h, idx) => (
                     <div
                       key={idx}
-                      className="p-3 rounded-lg bg-zinc-900 border border-emerald-500/20 space-y-1.5 text-xs font-sans animate-fadeIn"
+                      className="p-3.5 rounded-xl bg-slate-900 border border-emerald-500/20 space-y-2 text-xs font-sans animate-fadeIn shadow-sm"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-emerald-400">
-                          Tier {h.hintLevel}: {h.title}
+                        <span className="font-bold text-emerald-400 font-mono text-[11px]">
+                          [Tier {h.hintLevel}] {h.title}
                         </span>
-                        <span className="text-[10px] text-zinc-500 font-mono">
-                          {h.hintLevel === 1 ? 'Intuition' : h.hintLevel === 2 ? 'Strategy' : 'Scaffolding'}
+                        <span className="text-[10px] text-slate-500 font-mono uppercase">
+                          {h.hintLevel === 1 ? 'Intuition' : h.hintLevel === 2 ? 'Strategy' : 'Syntax Scaffolding'}
                         </span>
                       </div>
-                      <p className="text-zinc-300 leading-relaxed">{h.explanation}</p>
-                      <div className="pt-1 border-t border-zinc-800 text-amber-300/90 flex items-start space-x-1.5 font-medium">
-                        <HelpCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <p className="text-slate-300 leading-relaxed text-xs">{h.explanation}</p>
+                      <div className="pt-1.5 border-t border-slate-800 text-amber-300/95 flex items-start space-x-1.5 font-medium text-xs">
+                        <HelpCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-400" />
                         <span>{h.leadingQuestion}</span>
                       </div>
                     </div>
@@ -245,11 +254,11 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
             </div>
 
             {/* Socratic Chat Stream */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar text-xs">
               {chatMessages.map(msg => (
                 <div
                   key={msg.id}
-                  className={`flex items-start space-x-2 text-xs ${
+                  className={`flex items-start space-x-2 ${
                     msg.sender === 'user' ? 'justify-end' : 'justify-start'
                   }`}
                 >
@@ -263,11 +272,11 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
                     className={`max-w-[85%] p-3 rounded-xl leading-relaxed whitespace-pre-wrap ${
                       msg.sender === 'user'
                         ? 'bg-indigo-600 text-white rounded-br-none shadow-sm'
-                        : 'bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-bl-none'
+                        : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none'
                     }`}
                   >
                     <div>{msg.text}</div>
-                    <div className={`text-[9px] mt-1 text-right ${msg.sender === 'user' ? 'text-indigo-200' : 'text-zinc-500'}`}>
+                    <div className={`text-[9px] mt-1 text-right ${msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-500'}`}>
                       {msg.timestamp}
                     </div>
                   </div>
@@ -281,26 +290,26 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
               ))}
 
               {isSendingMessage && (
-                <div className="flex items-center space-x-2 text-xs text-zinc-500">
+                <div className="flex items-center space-x-2 text-xs text-slate-500">
                   <Bot className="w-4 h-4 animate-spin text-emerald-400" />
                   <span>Socratic TA is thinking...</span>
                 </div>
               )}
             </div>
 
-            {/* Socratic Chat Input Box */}
-            <form onSubmit={handleSendMessage} className="p-3 bg-zinc-900 border-t border-zinc-800 flex items-center space-x-2">
+            {/* Socratic Chat Input */}
+            <form onSubmit={handleSendMessage} className="p-3 bg-slate-900 border-t border-slate-800 flex items-center space-x-2">
               <input
                 type="text"
                 value={inputMessage}
                 onChange={e => setInputMessage(e.target.value)}
-                placeholder="Ask Socratic TA (e.g. Why would a stack be better here?)"
-                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
+                placeholder="Ask Socratic TA a guiding question..."
+                className="flex-1 bg-[#090d16] border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
               />
               <button
                 type="submit"
                 disabled={!inputMessage.trim() || isSendingMessage}
-                className="p-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white transition-colors"
+                className="p-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white transition-colors shadow-sm"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -318,96 +327,95 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ problem, cur
           </div>
         )}
 
-        {/* TAB 3: COMPLEXITY & CODE REVIEW */}
+        {/* TAB 3: AUTOMATED COMPLEXITY & CODE REVIEW (AI Feature 3) */}
         {activeTab === 'review' && (
           <div className="h-full overflow-y-auto p-4 space-y-4 custom-scrollbar">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-white">
-                  Automated Big-O & Quality Review
+                <h3 className="text-sm font-bold text-white flex items-center space-x-1.5">
+                  <BarChart2 className="w-4 h-4 text-indigo-400" />
+                  <span>Automated Complexity & Code Reviewer</span>
                 </h3>
-                <p className="text-xs text-zinc-400">
-                  Deep analysis of time/space complexity and C++/Python idioms.
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Evaluates Big O asymptotic complexity, memory bounds, and language idioms.
                 </p>
               </div>
 
               <button
                 onClick={handleAnalyzeComplexity}
                 disabled={isLoadingReview}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs shadow-md transition-all"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs shadow-md shadow-indigo-600/30 transition-all"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{isLoadingReview ? 'Analyzing...' : 'Analyze My Code'}</span>
+                <span>{isLoadingReview ? 'Analyzing...' : 'Analyze Code'}</span>
               </button>
             </div>
 
             {!reviewResult ? (
-              <div className="p-8 rounded-xl border border-dashed border-zinc-800 text-center text-zinc-500 text-xs">
-                <BarChart2 className="w-8 h-8 mx-auto mb-2 text-zinc-600" />
-                Click "Analyze My Code" to evaluate the algorithmic complexity and clean-code quality of your solution.
+              <div className="p-8 rounded-2xl border border-dashed border-slate-800 text-center text-slate-500 text-xs space-y-2">
+                <BarChart2 className="w-8 h-8 mx-auto text-slate-600" />
+                <p>Click "Analyze Code" to generate Big O analysis and language-specific best practices.</p>
               </div>
             ) : (
               <div className="space-y-4 animate-fadeIn">
-                {/* Big-O Rating Summary */}
-                <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
+                {/* Result Card Matching Feature 3 Output Structure */}
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-zinc-400 uppercase">Estimated Complexity</span>
+                    <span className="text-xs font-mono text-slate-400 uppercase">Complexity Profile</span>
                     <span
                       className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
-                        reviewResult.rating === 'Optimal'
+                        reviewResult.passesConstraints
                           ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                          : reviewResult.rating === 'Suboptimal'
-                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
                           : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
                       }`}
                     >
-                      {reviewResult.rating}
+                      {reviewResult.passesConstraints ? 'Passes Constraints ✓' : 'Exceeds Constraints ✗'}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-800">
-                    <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
-                      <div className="text-[11px] text-zinc-500">Time Complexity</div>
-                      <div className="text-base font-bold font-mono text-indigo-400">{reviewResult.timeComplexity}</div>
-                      <div className="text-[11px] text-zinc-400 mt-1">{reviewResult.timeExplanation}</div>
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                    <div className="bg-[#090d16] p-3 rounded-lg border border-slate-800">
+                      <div className="text-[10px] text-slate-500 uppercase font-mono">Time Complexity</div>
+                      <div className="text-lg font-black font-mono text-indigo-400 mt-0.5">
+                        {reviewResult.timeComplexity}
+                      </div>
                     </div>
 
-                    <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
-                      <div className="text-[11px] text-zinc-500">Space Complexity</div>
-                      <div className="text-base font-bold font-mono text-purple-400">{reviewResult.spaceComplexity}</div>
-                      <div className="text-[11px] text-zinc-400 mt-1">{reviewResult.spaceExplanation}</div>
+                    <div className="bg-[#090d16] p-3 rounded-lg border border-slate-800">
+                      <div className="text-[10px] text-slate-500 uppercase font-mono">Space Complexity</div>
+                      <div className="text-lg font-black font-mono text-purple-400 mt-0.5">
+                        {reviewResult.spaceComplexity}
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="p-2.5 bg-slate-950/70 rounded-lg border border-slate-800 text-xs text-slate-300">
+                    <span className="font-bold text-white">Summary: </span>
+                    {reviewResult.summary}
                   </div>
                 </div>
 
-                {/* Algorithmic Suggestions */}
-                <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                    Algorithmic Feedback
-                  </h4>
-                  <ul className="space-y-1 text-xs text-zinc-300">
-                    {reviewResult.suggestions.map((s, idx) => (
-                      <li key={idx} className="flex items-start space-x-1.5">
-                        <ArrowRight className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
-                        <span>{s}</span>
-                      </li>
-                    ))}
-                  </ul>
+                {/* C++ Specific Best Practice Tips */}
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-blue-900/30 space-y-1.5 text-xs">
+                  <div className="flex items-center space-x-1.5 text-blue-400 font-bold uppercase tracking-wider text-[11px]">
+                    <Code2 className="w-3.5 h-3.5" />
+                    <span>C++ Best Practice Tips</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    {reviewResult.cPlusPlusTips}
+                  </p>
                 </div>
 
-                {/* Memory & Language Optimization */}
-                <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                    {language.toUpperCase()} Memory & Performance Tips
-                  </h4>
-                  <ul className="space-y-1.5 text-xs text-zinc-300">
-                    {reviewResult.memoryOptimizations.map((tip, idx) => (
-                      <li key={idx} className="flex items-start space-x-1.5">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
+                {/* Python Specific Best Practice Tips */}
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-amber-900/30 space-y-1.5 text-xs">
+                  <div className="flex items-center space-x-1.5 text-amber-400 font-bold uppercase tracking-wider text-[11px]">
+                    <Code2 className="w-3.5 h-3.5" />
+                    <span>Python Best Practice Tips</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    {reviewResult.pythonTips}
+                  </p>
                 </div>
               </div>
             )}
